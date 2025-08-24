@@ -1,5 +1,6 @@
-import { db } from '@/lib/db'
-import { TrustedIssuer, RevocationCache } from '@/lib/types'
+// lib/trustCache.ts
+/* eslint-disable no-console */
+import { db, LocalTrustedIssuer, LocalRevocationCache } from '@/lib/db'
 
 // Trust cache manager logic
 export class TrustCacheManager {
@@ -12,9 +13,9 @@ export class TrustCacheManager {
     return TrustCacheManager.instance
   }
 
-  async addTrustedIssuer(issuer: Omit<TrustedIssuer, 'addedDate'>): Promise<void> {
+  async addTrustedIssuer(issuer: Omit<LocalTrustedIssuer, 'addedDate'>): Promise<void> {
     try {
-      const trustedIssuer: TrustedIssuer = {
+      const trustedIssuer: LocalTrustedIssuer = {
         ...issuer,
         addedDate: new Date(),
       }
@@ -40,9 +41,9 @@ export class TrustCacheManager {
       const issuer = await db.trustedIssuers
         .where('id')
         .equals(issuerId)
-        .and(issuer => issuer.trusted)
+        .and((issuer) => issuer.trusted)
         .first()
-      
+
       return !!issuer
     } catch (error) {
       console.error('Failed to check trusted issuer:', error)
@@ -50,7 +51,7 @@ export class TrustCacheManager {
     }
   }
 
-  async getTrustedIssuers(): Promise<TrustedIssuer[]> {
+  async getTrustedIssuers(): Promise<LocalTrustedIssuer[]> {
     try {
       return await db.trustedIssuers.orderBy('addedDate').reverse().toArray()
     } catch (error) {
@@ -73,7 +74,7 @@ export class TrustCacheManager {
       const ttl = new Date()
       ttl.setHours(ttl.getHours() + ttlHours)
 
-      const cacheEntry: RevocationCache = {
+      const cacheEntry: LocalRevocationCache = {
         vcId,
         isRevoked,
         cachedAt: new Date(),
@@ -92,7 +93,7 @@ export class TrustCacheManager {
       const cached = await db.revocationCache
         .where('vcId')
         .equals(vcId)
-        .and(cache => cache.ttl > new Date())
+        .and((cache) => cache.ttl > new Date())
         .first()
 
       return cached ? cached.isRevoked : null
@@ -112,34 +113,36 @@ export class TrustCacheManager {
   }
 
   async getHealthStats(): Promise<{
-    totalIssuers: number
-    trustedIssuers: number
-    untrustedIssuers: number
-    cacheEntries: number
-  }> {
-    try {
-      const [total, trusted, cache] = await Promise.all([
-        db.trustedIssuers.count(),
-        db.trustedIssuers.where('trusted').equals(true).count(),
-        db.revocationCache.count(),
-      ])
+  totalIssuers: number
+  trustedIssuers: number
+  untrustedIssuers: number
+  cacheEntries: number
+}> {
+  try {
+    const [total, trusted, cache] = await Promise.all([
+      db.trustedIssuers.count(),
+      // 👇 Do NOT use where('trusted').equals(true) — boolean isn't an IndexableType
+      db.trustedIssuers.filter((i) => i.trusted === true).count(),
+      db.revocationCache.count(),
+    ]);
 
-      return {
-        totalIssuers: total,
-        trustedIssuers: trusted,
-        untrustedIssuers: total - trusted,
-        cacheEntries: cache,
-      }
-    } catch (error) {
-      console.error('Failed to get health stats:', error)
-      return {
-        totalIssuers: 0,
-        trustedIssuers: 0,
-        untrustedIssuers: 0,
-        cacheEntries: 0,
-      }
-    }
+    return {
+      totalIssuers: total,
+      trustedIssuers: trusted,
+      untrustedIssuers: total - trusted,
+      cacheEntries: cache,
+    };
+  } catch (error) {
+    console.error('Failed to get health stats:', error);
+    return {
+      totalIssuers: 0,
+      trustedIssuers: 0,
+      untrustedIssuers: 0,
+      cacheEntries: 0,
+    };
   }
+}
+
 }
 
 export const trustCacheManager = TrustCacheManager.getInstance()

@@ -1,41 +1,52 @@
+// app/api/sync/verification-results/route.ts
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+import { VerificationResultSchema } from '@/lib/types';
 
-// Expected body shape (adjust as needed):
-// {
-//   vcId: string,
-//   status: string,
-//   timestamp?: string|number, // optional, defaults to now
-//   checks?: any,
-//   errors?: any,
-//   metadata?: any
-// }
+const PayloadSchema = z.union([
+  z.object({ result: VerificationResultSchema, resultId: z.string().optional() }),
+  VerificationResultSchema, // allow sending the result directly
+]);
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const raw = await req.json();
+    const parsed = PayloadSchema.parse(raw);
+    const result = 'result' in parsed ? parsed.result : parsed;
 
-    // basic guardrails
-    if (!body?.vcId || !body?.status) {
-      return NextResponse.json({ ok: false, error: 'vcId and status are required' }, { status: 400 });
-    }
-
-    const rec = await prisma.verificationResult.create({
-      data: {
-        vcId: body.vcId,
-        status: body.status,
-        timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
-        checks: body.checks ?? {},
-        errors: body.errors ?? null,
-        metadata: body.metadata ?? {},
-        // synced defaults to false
+    // Persist. If the same id arrives again, just update.
+    await prisma.verificationResult.upsert({
+      where: { id: result.id },
+      update: {
+        vcId: result.vcId,
+        status: result.status,
+        timestamp: result.timestamp,
+        checks: JSON.stringify(result.checks),
+        errors: result.errors ? JSON.stringify(result.errors) : undefined,
+        metadata: JSON.stringify(result.metadata),
+        synced: true,
+      },
+      create: {
+        id: result.id,
+        vcId: result.vcId,
+        status: result.status,
+        timestamp: result.timestamp,
+        checks: JSON.stringify(result.checks),
+        errors: result.errors ? JSON.stringify(result.errors) : undefined,
+        metadata: JSON.stringify(result.metadata),
+        synced: true,
       },
     });
 
-    return NextResponse.json({ ok: true, id: rec.id });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[api] verification-results failed:', err);
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ ok: false, error: 'invalid-payload' }, { status: 400 });
+    }
     return NextResponse.json({ ok: false, error: 'write-failed' }, { status: 500 });
   }
 }

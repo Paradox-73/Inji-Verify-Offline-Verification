@@ -1,0 +1,9 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "id": "urn:uuid:123",
+  "type": ["VerifiableCredential", "TestCredential"],
+  "issuer": "did:example:issuer",
+  "issuanceDate": "2024-01-01T00:00:00Z",
+  "credentialSubject": { "id": "did:example:holder", "name": "Alice" },
+  "proof": { "type": "Ed25519Signature2020", "created": "2024-01-01T00:00:00Z", "verificationMethod": "did:example:issuer#keys-1", "proofPurpose": "assertionMethod", "proofValue": "NOT-A-REAL-SIGNATURE" }
+}

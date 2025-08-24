@@ -1,4 +1,4 @@
-// lib/schema.prisma
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,50 +8,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model VerificationResult {
-  id        String   @id @default(cuid())
-  vcId      String
-  status    String
-  timestamp DateTime @default(now())
-  checks    Json
-  errors    Json?
-  metadata  Json
-  synced    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("verification_results")
-}
-
 model TrustedIssuer {
-  id                 String   @id @default(cuid())
+  // “did” is the natural key; keep it unique
+  did                String  @id
   name               String
   publicKey          String
-  revocationEndpoint String?
+  revocationEndpoint String? // optional
   trusted            Boolean  @default(true)
-  addedDate          DateTime @default(now())
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-
-  @@map("trusted_issuers")
 }
 
-model SyncQueue {
-  id          String    @id @default(cuid())
-  type        String                 // e.g. 'verification-result' | 'settings-sync'
-  data        String                 // encrypted JSON blob (ciphertext)
-  retryCount  Int       @default(0)
-  createdAt   DateTime  @default(now())
-  lastAttempt DateTime?
-  processed   Boolean   @default(false)
+model VerificationResult {
+  id        String   @id
+  vcId      String
+  status    String   // 'valid' | 'invalid' | 'error' | 'expired'
+  timestamp DateTime
 
-  @@map("sync_queue")
+  // SQLite supports Json
+  checks    Json
+  errors    Json?    // null when none
+  metadata  Json
+
+  synced    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model AppSetting {
-  id         String   @id @default(cuid())
-  key        String   @unique
-  value      Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

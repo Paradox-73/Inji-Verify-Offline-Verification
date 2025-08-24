@@ -1,6 +1,8 @@
+// lib/types.ts
 import { z } from 'zod'
 
-// Core VC verification types
+// ---- VC + UI types (client) ----
+
 export const VerifiableCredentialSchema = z.object({
   '@context': z.array(z.string()),
   id: z.string(),
@@ -47,38 +49,12 @@ export const SettingsSchema = z.object({
   autoSync: z.boolean().default(true),
   encryptionEnabled: z.boolean().default(true),
   maxStorageEntries: z.number().min(10).max(10000).default(1000),
-  cacheTTL: z.number().min(3600).max(86400 * 30).default(86400 * 7), // 7 days default
+  cacheTTL: z.number().min(3600).max(86400 * 30).default(86400 * 7),
 })
 
 export type VerifiableCredential = z.infer<typeof VerifiableCredentialSchema>
 export type VerificationResult = z.infer<typeof VerificationResultSchema>
 export type Settings = z.infer<typeof SettingsSchema>
-
-// Additional types for database schema
-export interface TrustedIssuer {
-  id: string
-  name: string
-  publicKey: string
-  revocationEndpoint?: string
-  addedDate: Date
-  trusted: boolean
-}
-
-export interface RevocationCache {
-  vcId: string
-  isRevoked: boolean
-  cachedAt: Date
-  ttl: Date
-}
-
-export interface SyncQueue {
-  id: string
-  type: 'verification-result' | 'settings-sync'
-  data: string // Encrypted JSON
-  retryCount: number
-  createdAt: Date
-  lastAttempt?: Date
-}
 
 // Error taxonomy for clear UX feedback
 export enum VerificationError {

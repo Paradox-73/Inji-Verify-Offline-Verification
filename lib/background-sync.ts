@@ -96,7 +96,15 @@ async function getDueJobs(limit = 10): Promise<Job[]> {
     const out: Job[] = [];
     const tx = db.transaction(STORE, 'readonly');
     const idx = tx.objectStore(STORE).index('nextAt');
-    const range = IDBKeyRange.upperBound(now());
+    theRange:
+    // all jobs whose nextAt <= now()
+    // eslint-disable-next-line no-undef
+    // @ts-ignore - IDBKeyRange is available in browser
+    // deno-lint-ignore no-explicit-any
+    {}
+    const range = (window as any).IDBKeyRange
+      ? (window as any).IDBKeyRange.upperBound(now())
+      : (IDBKeyRange as unknown as typeof window.IDBKeyRange).upperBound(now());
     const req = idx.openCursor(range);
     req.onsuccess = () => {
       const cur = req.result;
@@ -150,7 +158,6 @@ class BackgroundSyncService {
 
   private emit(s: SyncStatus) {
     this.status = s;
-    // Use forEach to avoid downlevel iteration issues
     this.listeners.forEach((l) => l(s));
   }
 
@@ -197,6 +204,16 @@ class BackgroundSyncService {
     if (this._visibilityHandler) {
       document.removeEventListener('visibilitychange', this._visibilityHandler);
       this._visibilityHandler = undefined;
+    }
+  }
+
+  /** Current number of queued jobs in IndexedDB. */
+  async getQueueSize(): Promise<number> {
+    if (!isBrowser()) return 0;
+    try {
+      return await countJobs();
+    } catch {
+      return 0;
     }
   }
 
@@ -262,6 +279,7 @@ class BackgroundSyncService {
             }
             processed++;
           } catch (err) {
+            // exponential backoff
             job.tries += 1;
             job.nextAt = now() + backoff(job.tries);
             await putJob(job); // update
@@ -283,7 +301,7 @@ class BackgroundSyncService {
     }
   }
 
-  // ---------- Aliases for older calling code ----------
+  // ---------- Aliases & typed queue helpers ----------
 
   /** Trigger an immediate sync (alias for flush) */
   async triggerSync(): Promise<{ processed: number; remaining: number }> {
@@ -297,20 +315,22 @@ class BackgroundSyncService {
 
   /**
    * Queue typed payloads to conventional endpoints
-   *  - 'verification-result' => POST /api/sync/verification-results
+   *  - 'verification-result' => POST /api/sync/verifications
    *  - 'settings-sync'       => POST /api/sync/settings
    */
-  async queueForSync(
-    type: 'verification-result' | 'settings-sync',
-    data: unknown
-  ) {
-    const url =
-      type === 'verification-result'
-        ? '/api/sync/verification-results'
-        : '/api/sync/settings';
+async queueForSync(
+  type: 'verification-result' | 'settings-sync',
+  data: unknown
+) {
+  const url =
+    type === 'verification-result'
+      ? '/api/sync/verifications'
+      : '/api/sync/settings';
+  return this.queueJson(url, data);
+}
 
-    return this.queueJson(url, data);
-  }
+
+  // Removed legacy helpers that pointed to /verification-results
 }
 
 export const backgroundSyncService = new BackgroundSyncService();

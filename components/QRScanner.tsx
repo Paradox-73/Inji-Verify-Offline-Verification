@@ -5,10 +5,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Camera, CameraOff, RefreshCw } from 'lucide-react'
 import { qrScannerService } from '@/lib/qr-scanner'
-import { VerifiableCredential } from '@/lib/types'
+import type { VerifiableCredential } from '@/lib/types'
 
 interface QRScannerProps {
-  onCredentialScanned: (credential: VerifiableCredential) => void
+  // ✅ accept VC OR raw text now
+  onCredentialScanned: (payload: VerifiableCredential | string) => void
   onError: (error: string) => void
   isActive: boolean
 }
@@ -20,20 +21,12 @@ export default function QRScanner({ onCredentialScanned, onError, isActive }: QR
 
   useEffect(() => {
     checkCameraPermission()
-    
-    return () => {
-      if (isScanning) {
-        stopScanning()
-      }
-    }
+    return () => { if (isScanning) stopScanning() }
   }, [])
 
   useEffect(() => {
-    if (isActive && !isScanning && hasPermission) {
-      startScanning()
-    } else if (!isActive && isScanning) {
-      stopScanning()
-    }
+    if (isActive && !isScanning && hasPermission) startScanning()
+    else if (!isActive && isScanning) stopScanning()
   }, [isActive, hasPermission])
 
   const checkCameraPermission = async (): Promise<void> => {
@@ -50,7 +43,6 @@ export default function QRScanner({ onCredentialScanned, onError, isActive }: QR
 
   const startScanning = async (): Promise<void> => {
     if (!scannerRef.current || isScanning || !hasPermission) return
-
     try {
       setIsScanning(true)
       await qrScannerService.startScanning(
@@ -67,7 +59,6 @@ export default function QRScanner({ onCredentialScanned, onError, isActive }: QR
 
   const stopScanning = async (): Promise<void> => {
     if (!isScanning) return
-
     try {
       await qrScannerService.stopScanning()
       setIsScanning(false)
@@ -77,11 +68,8 @@ export default function QRScanner({ onCredentialScanned, onError, isActive }: QR
   }
 
   const toggleScanning = (): void => {
-    if (isScanning) {
-      stopScanning()
-    } else {
-      startScanning()
-    }
+    if (isScanning) stopScanning()
+    else startScanning()
   }
 
   if (hasPermission === false) {
