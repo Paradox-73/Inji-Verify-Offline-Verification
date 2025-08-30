@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
+    "@mosip/react-inji-verify-sdk": "^0.13.1",
     "@next/bundle-analyzer": "^15.4.6",
     "@next/swc-wasm-nodejs": "13.5.1",
     "@prisma/client": "^6.14.0",
@@ -87,6 +88,7 @@
     "tailwindcss": "3.3.3",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.2.2",
+    "uuid": "^11.1.0",
     "vaul": "^0.9.9",
     "workbox-webpack-plugin": "^7.3.0",
     "zod": "^3.25.76",
@@ -94,6 +96,7 @@
     "zxing-wasm": "^2.2.1"
   },
   "devDependencies": {
+    "@types/uuid": "^10.0.0",
     "prisma": "^6.14.0",
     "qrcode": "^1.5.4"
   }

@@ -1,4 +1,4 @@
-// prisma/schema.prisma
+// lib/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,34 +8,69 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model TrustedIssuer {
-  // “did” is the natural key; keep it unique
-  did                String  @id
-  name               String
-  publicKey          String
-  revocationEndpoint String? // optional
-  trusted            Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+/// A single Verifiable Credential (raw JSON-LD + extracted useful columns)
+model VerifiableCredential {
+  id               String   @id @default(cuid())
+
+  // Raw VC JSON-LD as received (entire credential, including @context, proof, etc)
+  vc               Json
+
+  // Useful extracted columns for querying / listing
+  vcId             String?        // VC's own "id" field (URL/URN)
+  issuer           String?
+  holderSubjectId  String?
+  types            String?        // joined array if type is array
+  validFrom        DateTime?
+  validUntil       DateTime?
+
+  // Optional W3C fields (kept as JSON for future-proofing)
+  credentialStatus Json?
+  credentialSchema Json?
+  refreshService   Json?
+  termsOfUse       Json?
+  evidence         Json?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  verificationResults VerificationResult[]
+
+  @@index([vcId])
+  @@index([issuer])
+  @@index([holderSubjectId])
+  @@index([validFrom])
+  @@index([validUntil])
 }
 
+/// A verification run/result for a VC
 model VerificationResult {
-  id        String   @id
-  vcId      String
-  status    String   // 'valid' | 'invalid' | 'error' | 'expired'
-  timestamp DateTime
-
-  // SQLite supports Json
+  id        String   @id @default(cuid())
+  status    String   // 'valid' | 'invalid' | 'expired' | 'error'
+  timestamp DateTime @default(now())
   checks    Json
-  errors    Json?    // null when none
+  errors    Json?
   metadata  Json
-
   synced    Boolean  @default(false)
+
+  // FK to VC row
+  vcDbId    String
+  vc        VerifiableCredential @relation(fields: [vcDbId], references: [id], onDelete: Cascade)
+
+  // convenience duplicate for filtering
+  vcId      String?
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([vcId])
+  @@index([timestamp])
 }
 
+/// Simple app settings key/value
 model AppSetting {
-  key       String   @id
+  id        String   @id @default(cuid())
+  key       String   @unique
   value     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

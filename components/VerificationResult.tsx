@@ -1,36 +1,42 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/StatusBadge'
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  Clock, 
-  User, 
-  Building, 
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  User,
+  Building,
   Calendar,
   Shield,
   Eye,
-  Download
+  Download,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
-import type  { VerificationResult }  from '@/lib/types'
-import { format } from 'date-fns'
+import type { VerificationResult } from '@/lib/types'
+import { format, isValid } from 'date-fns'
 
 interface VerificationResultProps {
   result: VerificationResult
+  /** Optional: full VC JSON to display richer details */
+  vc?: any
   onViewDetails?: () => void
   onExport?: () => void
 }
 
-export default function VerificationResult({ 
-  result, 
-  onViewDetails, 
-  onExport 
+export default function VerificationResult({
+  result,
+  vc,
+  onViewDetails,
+  onExport
 }: VerificationResultProps) {
+  const [showRaw, setShowRaw] = useState(false)
+
   const getStatusIcon = () => {
     switch (result.status) {
       case 'valid':
@@ -61,6 +67,46 @@ export default function VerificationResult({
     }
   }
 
+  // ---- Safe value helpers (prefer metadata, fall back to VC) ----
+  const issuer =
+    result.metadata?.issuer ??
+    (typeof vc?.issuer === 'string' ? vc?.issuer : vc?.issuer?.id) ??
+    '-'
+
+  const typesText = (() => {
+    if (result.metadata?.type) return result.metadata.type
+    if (Array.isArray(vc?.type)) return vc.type.join(', ')
+    if (typeof vc?.type === 'string') return vc.type
+    return '-'
+  })()
+
+  const subjectId =
+    result.metadata?.subjectId ??
+    vc?.credentialSubject?.id ??
+    '-'
+
+  const issuedStr =
+    result.metadata?.issuanceDate ??
+    vc?.validFrom ??
+    vc?.issuanceDate ??
+    ''
+
+  const expStr =
+    result.metadata?.expirationDate ??
+    vc?.validUntil ??
+    vc?.expirationDate ??
+    ''
+
+  const formatMaybeDate = (value: string | Date | undefined | null) => {
+    if (!value) return '-'
+    const d = typeof value === 'string' ? new Date(value) : value
+    return isValid(d) ? format(d, 'MMM dd, yyyy') : '-'
+  }
+
+  const proof = vc?.proof
+  const hasProof =
+    proof && (proof.type || proof.verificationMethod || proof.created || proof.proofPurpose)
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -70,7 +116,10 @@ export default function VerificationResult({
             <div>
               <CardTitle className="text-lg">{getStatusText()}</CardTitle>
               <p className="text-sm text-gray-600">
-                {format(result.timestamp, 'MMM dd, yyyy at HH:mm')}
+                {formatMaybeDate(result.timestamp)} at{' '}
+                {isValid(new Date(result.timestamp))
+                  ? format(new Date(result.timestamp), 'HH:mm')
+                  : '--:--'}
               </p>
             </div>
           </div>
@@ -86,8 +135,8 @@ export default function VerificationResult({
               <Building className="w-4 h-4 text-gray-400" />
               <span className="text-sm font-medium">Issuer</span>
             </div>
-            <p className="text-sm text-gray-700 truncate" title={result.metadata.issuer}>
-              {result.metadata.issuer}
+            <p className="text-sm text-gray-700 truncate" title={issuer}>
+              {issuer || '-'}
             </p>
           </div>
 
@@ -97,7 +146,7 @@ export default function VerificationResult({
               <span className="text-sm font-medium">Type</span>
             </div>
             <p className="text-sm text-gray-700">
-              {result.metadata.type}
+              {typesText}
             </p>
           </div>
 
@@ -107,30 +156,30 @@ export default function VerificationResult({
               <span className="text-sm font-medium">Issued</span>
             </div>
             <p className="text-sm text-gray-700">
-              {format(new Date(result.metadata.issuanceDate), 'MMM dd, yyyy')}
+              {formatMaybeDate(issuedStr)}
             </p>
           </div>
 
-          {result.metadata.expirationDate && (
+          {expStr ? (
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span className="text-sm font-medium">Expires</span>
               </div>
               <p className="text-sm text-gray-700">
-                {format(new Date(result.metadata.expirationDate), 'MMM dd, yyyy')}
+                {formatMaybeDate(expStr)}
               </p>
             </div>
-          )}
+          ) : null}
 
-          {result.metadata.subjectId && (
+          {subjectId && subjectId !== '-' && (
             <div className="space-y-2 md:col-span-2">
               <div className="flex items-center space-x-2">
                 <User className="w-4 h-4 text-gray-400" />
                 <span className="text-sm font-medium">Subject ID</span>
               </div>
               <p className="text-sm text-gray-700 break-all">
-                {result.metadata.subjectId}
+                {subjectId}
               </p>
             </div>
           )}
@@ -148,29 +197,67 @@ export default function VerificationResult({
                   <XCircle className="w-4 h-4 text-red-500" />
                 )}
                 <span className="text-sm">
-                  {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  {key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
                 </span>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Proof (from VC) */}
+        {hasProof && (
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-semibold mb-2">Proof</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+              <div><span className="font-medium">Type:</span> {proof?.type ?? '-'}</div>
+              <div><span className="font-medium">Purpose:</span> {proof?.proofPurpose ?? '-'}</div>
+              <div className="md:col-span-2">
+                <span className="font-medium">Verification Method:</span>{' '}
+                {proof?.verificationMethod ?? '-'}
+              </div>
+              <div className="md:col-span-2">
+                <span className="font-medium">Created:</span>{' '}
+                {formatMaybeDate(proof?.created)}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Errors */}
         {result.errors && result.errors.length > 0 && (
           <div className="border-t pt-4">
             <h4 className="text-sm font-semibold mb-2 text-red-600">Errors</h4>
             <div className="space-y-1">
-              {result.errors.map((error, index) => (
-                <div key={index} className="flex items-start space-x-2">
+              {result.errors.map((err, i) => (
+                <div key={i} className="flex items-start space-x-2">
                   <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-red-700">{error}</p>
+                  <p className="text-sm text-red-700">{err}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Sync Status */}
+        {/* Raw VC JSON (collapsible) */}
+        {vc && (
+          <div className="border-t pt-4">
+            <button
+              type="button"
+              onClick={() => setShowRaw(s => !s)}
+              className="flex items-center text-sm font-semibold mb-2 hover:opacity-80"
+            >
+              {showRaw ? <ChevronDown className="w-4 h-4 mr-1" /> : <ChevronRight className="w-4 h-4 mr-1" />}
+              Raw VC JSON
+            </button>
+            {showRaw && (
+              <pre className="text-xs bg-gray-50 border rounded p-3 overflow-auto max-h-80">
+                {JSON.stringify(vc, null, 2)}
+              </pre>
+            )}
+          </div>
+        )}
+
+        {/* Sync + actions */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -179,7 +266,7 @@ export default function VerificationResult({
                 {result.synced ? 'Synced to server' : 'Pending sync'}
               </span>
             </div>
-            
+
             <div className="flex space-x-2">
               {onViewDetails && (
                 <Button variant="outline" size="sm" onClick={onViewDetails}>

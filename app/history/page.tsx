@@ -1,14 +1,13 @@
 'use client';
-
 import React from 'react';
 import { useVerifications } from '@/hooks/useVerifications';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import VerificationResult from '@/components/VerificationResult'; // your existing card component
+import VerificationResult from '@/components/VerificationResult';
 import { RefreshCw } from 'lucide-react';
 
 export default function HistoryPage() {
-  const { results, isLoading, syncNow, refresh } = useVerifications();
+  const { results, vcByResultId, isLoading, syncNow } = useVerifications();
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
@@ -26,7 +25,7 @@ export default function HistoryPage() {
         <Card><CardContent className="p-6 text-gray-600">No results yet.</CardContent></Card>
       ) : (
         results.map((r) => (
-          <VerificationResult key={r.id} result={r} onExport={() => {}} />
+          <VerificationResult key={r.id} result={r} vc={vcByResultId[r.id]} onExport={() => {}} />
         ))
       )}
     </div>
