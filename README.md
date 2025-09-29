@@ -1,7 +1,7 @@
 # 🌐 Inji Verify – Offline Verifiable Credential Verification (PWA + Backend)
 
 This project implements an **offline-first verifier** for W3C/MOSIP Verifiable Credentials (VCs) using the **Inji Verify SDK**.  
-It supports scanning QR codes, verifying credentials offline, storing results locally, and syncing them to a backend when online.  
+It supports scanning QR codes, verifying credentials offline, storing results locally, and syncing them to a backend when online.. 
 
 ---
 
