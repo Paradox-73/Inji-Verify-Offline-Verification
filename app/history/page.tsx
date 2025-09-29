@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import VerificationResult from '@/components/VerificationResult';
 import { RefreshCw } from 'lucide-react';
+import { downloadJson } from '@/lib/download';
 
 export default function HistoryPage() {
   const { results, vcByResultId, isLoading, syncNow } = useVerifications();
@@ -25,7 +26,21 @@ export default function HistoryPage() {
         <Card><CardContent className="p-6 text-gray-600">No results yet.</CardContent></Card>
       ) : (
         results.map((r) => (
-          <VerificationResult key={r.id} result={r} vc={vcByResultId[r.id]} onExport={() => {}} />
+          <VerificationResult key={r.id} result={r} vc={vcByResultId[r.id]} onExport={() => {
+              const exportData = {
+                result: {
+                  ...r,
+                  // make sure any Date-like values are strings
+                  timestamp: typeof r.timestamp === 'string'
+                    ? r.timestamp
+                    : new Date(r.timestamp as any).toISOString(),
+                },
+                vc: vcByResultId[r.id] ?? null,
+                exportedAt: new Date().toISOString(),
+                version: '1.0',
+              };
+              downloadJson(`vc-verification-${r.id}.json`, exportData);
+            }} />
         ))
       )}
     </div>
